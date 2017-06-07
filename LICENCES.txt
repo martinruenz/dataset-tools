@@ -1,0 +1,4 @@
+This repository includes third-party open-source software with separate licenses, such as all files within the external directory.
+
+Code written by myself is subject to the GPLv3 license, which you can find in LICENSE.txt
+Please refer to individual files to learn more about their license.
