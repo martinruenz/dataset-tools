@@ -1,8 +1,4 @@
-Various dataset tools
-=====================
-
-  # Installation
-  --------------
+# Installation
 
    ## Requirements
 
@@ -25,8 +21,7 @@ Various dataset tools
     #   Log out and in again afterwards!
     echo "PATH=\$PATH:`pwd`" >> ~/.profile
 
-  # HowTos
-  --------
+# HowTos
 
   * **How to evaluate your object-aware SLAM-method completely automatically?** (Analyse segmentation and trajectory quality)
 
@@ -40,7 +35,7 @@ Various dataset tools
 
     <br />
     Example using Co-Fusion:
-    
+
         CoFusion \
           -basedir /path/to/CarScene4/ \
           -dir colour \
@@ -117,12 +112,12 @@ Various dataset tools
           # and different IDs (-r, where the parameter is id,id,id)
 
 
-  # Tools
-  ------
+# Tools
 
-  ### Scripts
 
-  #### Blender
+  ## Scripts
+
+  ### Blender
 
   └── **io_export_pose.py**  
 
@@ -147,7 +142,7 @@ Various dataset tools
       t x y z qx qy qz qw  
   ![screenrecording](images/trajectoryViewer.gif)
 
-  ### C++ Tools
+  ## C++ Tools
 
   **convert_depth** *[Blender]*
 
@@ -192,7 +187,6 @@ Various dataset tools
 
   Merge labels with certain amount of neighbours.
 
-  # License
-  ---------
+# License
 
   More information regarding licensing can be found in LICENCES.txt
