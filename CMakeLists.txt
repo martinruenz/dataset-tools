@@ -27,10 +27,7 @@ add_subdirectory(label_merger)
 add_subdirectory(label_associator)
 add_subdirectory(label_finder)
 add_subdirectory(evaluate_segmentation)
-add_subdirectory(evaluate_reconstruction)
 add_subdirectory(evaluate_rgbd_camera)
-
-add_subdirectory(trajectory_tool)
 
 # Tell QtCreator to show these files
 file(GLOB showfiles *.h *.md common/*.h common/*.cpp)
