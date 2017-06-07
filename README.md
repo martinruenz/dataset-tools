@@ -7,10 +7,6 @@ Various dataset tools
    ## Requirements
 
    * opencv
-   * pcl and flann for `evaluate_reconstruction`
-
-    `sudo apt-get install libpcl-dev libflann-dev`
-
    * glm for trajectory_tool
 
     `sudo apt-get install libglm-dev`
@@ -195,3 +191,8 @@ Various dataset tools
   **label_merger**
 
   Merge labels with certain amount of neighbours.
+
+  # License
+  ---------
+
+  More information regarding licensing can be found in LICENCES.txt
