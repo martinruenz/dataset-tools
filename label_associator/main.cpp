@@ -64,9 +64,9 @@ pair<map<int, int>, std::vector<int>> mapLabels(const std::vector<LabelDescripti
 
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv);
+    Parser parser(argc, argv);
 
-    if(!Parser::hasOption("--dir") || !Parser::hasOption("--outdir")){
+    if(!parser.hasOption("--dir") || !parser.hasOption("--outdir")){
         cout << "Error, invalid arguments.\n"
                 "Mandatory --dir: Path to directory containing label images.\n"
                 "Mandatory --outdir: Output path.\n"
@@ -78,10 +78,10 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    string directory = Parser::getOption("--dir");
-    string out_directory = Parser::getOption("--outdir");
-    string class_directory = Parser::getOption("--classdir");
-    float maxDist = Parser::getFloatOption("--maxDist", numeric_limits<float>::max());
+    string directory = parser.getOption("--dir");
+    string out_directory = parser.getOption("--outdir");
+    string class_directory = parser.getOption("--classdir");
+    float maxDist = parser.getFloatOption("--maxDist", numeric_limits<float>::max());
 
     std::vector<LabelDescription> prevLabels;
     unsigned nextNewLabelID = 1;

@@ -1,4 +1,15 @@
 Debug/
+debug/
 Release/
+release/
+Default/
+default/
+Build/
+build/
+builds/
+cmake-build-debug/
+cmake-build-release/
 *.pyc
 CMakeLists.txt.user
+.idea/
+external/opencv/

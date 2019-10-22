@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>
 *****************************************************************/
 
 #include "../common/common.h"
+#include "../common/common_random.h"
 #include "../common/common_3d.h"
 
 using namespace std;
@@ -23,11 +24,11 @@ using namespace cv;
 
 // Input: Projective depth values (distances to camera center)
 // Output: Depth values (z-component)
-Mat convertDepth(Mat input, const PinholeParameters& intrinsics){
+Mat convertDistanceToZ(Mat input, const PinholeParameters& intrinsics){
 
-    if(input.type() != CV_32FC3) // convert fx or fy to f and test
+    if(input.type() != CV_32FC3)
     {
-        cerr << "Error, wrong image format in makeDepthProjective()." << endl;
+        cerr << "Error, wrong image format in convertDistanceToZ()." << endl;
         return Mat();
     }
 
@@ -39,9 +40,36 @@ Mat convertDepth(Mat input, const PinholeParameters& intrinsics){
         cv::Vec3f* pixel = input.ptr<cv::Vec3f>(i);
         float* pOut = result.ptr<float>(i);
         for (int j = 0; j < input.cols; ++j){
-            Vec3d ray = cam.toRay(Vec2d(j,i));
+            Eigen::Vector3d ray = cam.toRay(Eigen::Vector2d(j,i));
             ray *= pixel[j][0];
             pOut[j] = ray[2];
+        }
+    }
+    return result;
+}
+
+// Input: Disparity values
+// Output: Depth values (z-component)
+// As used in https://github.com/victorprad/InfiniTAM/blob/1f52e8c85df795cb7643977059b88c81e4a56e40/InfiniTAM/ITMLib/Engines/ViewBuilding/Shared/ITMViewBuilder_Shared.h
+Mat convertDisparityToZ(Mat input){
+
+    if(input.type() != CV_16UC1)
+    {
+        cerr << "Error, wrong image format in convertDisparityToZ()." << endl;
+        return Mat();
+    }
+
+    Mat result(input.rows, input.cols, CV_32FC1);
+    float a = 1135.09;
+    float b = 1135.09;
+    float fx_depth = 573.71;
+    for (int i = 0; i < input.rows; ++i){
+        unsigned short* pixel = input.ptr<unsigned short>(i);
+        float* pOut = result.ptr<float>(i);
+        for (int j = 0; j < input.cols; ++j){
+            float disparity_tmp = (a - (float)(pixel[j]));
+            (disparity_tmp == 0) ? pOut[j] = 0.0 : pOut[j] = 0.001f * b * fx_depth / disparity_tmp;
+            if(pOut[j] < 0) pOut[j] = 0;
         }
     }
     return result;
@@ -83,7 +111,7 @@ Mat addNoise(Mat input, const PinholeParameters& intrinsics, bool withNormalShif
 
             if(withNormalShift){
                 Point3D& point = cloud.at(j,i);
-                Vec3f v = normalize(point.p);
+                Eigen::Vector3d v = point.p.normalized();
                 float angle = acos(fabs(v.dot(point.n)));
 
                 GaussianNoise noiseGeneratorN(0, 0.3 * angle/(pOut[j]+0.1));
@@ -106,20 +134,21 @@ Mat addNoise(Mat input, const PinholeParameters& intrinsics, bool withNormalShif
 
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv);
+    Parser parser(argc, argv);
 
-    if(!Parser::hasOption("--dir") ||
-       !Parser::hasOption("--outdir") ||
-       ((Parser::hasOption("-ns") ||
-         Parser::hasOption("-z")) &&
-         (!Parser::hasOption("-cx") ||
-          !Parser::hasOption("-cy") ||
-          !Parser::hasOption("-fx") ||
-          !Parser::hasOption("-fy"))) ||
-       (!Parser::hasOption("-n") &&
-        !Parser::hasOption("-z"))){
+    if(!parser.hasOption("--dir") ||
+       !parser.hasOption("--outdir") ||
+       ((parser.hasOption("-ns") ||
+         parser.hasOption("-z")) &&
+         (!parser.hasOption("-cx") ||
+          !parser.hasOption("-cy") ||
+          !parser.hasOption("-fx") ||
+          !parser.hasOption("-fy"))) ||
+       (!parser.hasOption("-n") &&
+        !parser.hasOption("-z") &&
+        !parser.hasOption("-d"))){
         cout << "Error, invalid arguments.\n"
-                "Mandatory --dir: Path to directory containing *.exr images.\n"
+                "Mandatory --dir: Path to directory containing depth images.\n"
                 "Mandatory --outdir: Output path.\n"
                 "Mandatory -cx: Optical center x.\n"
                 "Mandatory -cy: Optical center y.\n"
@@ -130,6 +159,7 @@ int main(int argc, char * argv[])
                 "Optional   -ns: Include normal shifts in noise (Not perfect!).\n"
                 "Optional   -dv: Discretisation value. Default: 35130.0f\n"
                 "Optional -z: Apply 'distance -> z' conversion.\n"
+                "Optional -d: Apply 'disparity -> z' conversion.\n"
                 "\n"
                 "Example: ./convert_depth --dir /path/to/image_folder/ -fx 528 -fy 528 -cx 320 -cy 240 -n"
                 "\n\n"
@@ -140,63 +170,56 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    string directory = Parser::getPathOption("--dir");
-    string out_directory = Parser::getPathOption("--outdir");
-    bool doNoise = Parser::hasOption("-n");
-    bool doConversion = Parser::hasOption("-z");
-    bool doNormalShift = Parser::hasOption("-ns");
-    float discrVal = Parser::getFloatOption("-dv", 35130.0f);
-    bool verbose = Parser::hasOption("-v");
+    string directory = parser.getDirOption("--dir");
+    string out_directory = parser.getDirOption("--outdir");
+    bool doNoise = parser.hasOption("-n");
+    bool do_distConversion = parser.hasOption("-z");
+    bool do_dispConversion = parser.hasOption("-d");
+    bool do_normalShift = parser.hasOption("-ns");
+    float discr_val = parser.getFloatOption("-dv", 35130.0f);
+    bool verbose = parser.hasOption("-v");
 
     PinholeParameters intrinsics;
-    intrinsics.cx = Parser::getFloatOption("-cx");
-    intrinsics.cy = Parser::getFloatOption("-cy");
-    intrinsics.fy = Parser::getFloatOption("-fy");
-    intrinsics.fx = Parser::getFloatOption("-fx");
+    intrinsics.cx = parser.getFloatOption("-cx");
+    intrinsics.cy = parser.getFloatOption("-cy");
+    intrinsics.fy = parser.getFloatOption("-fy");
+    intrinsics.fx = parser.getFloatOption("-fx");
 
-    if(doConversion) cout << "Converting depth values..." << endl;
+    if(do_distConversion) cout << "Converting dist->depth values..." << endl;
+    else if(do_dispConversion) cout << "Converting disp->depth values..." << endl;
     if(doNoise) cout << "Adding noise..." << endl;
 
-    vector<pair<string,string> > files; // path in / path out
-    const string fileExtension = ".exr";
+    vector<string> files = getFilenames(directory, {".exr", ".pgm"});
 
-    using namespace boost::filesystem;
-    using namespace boost::algorithm;
-    for(auto it = directory_iterator(directory); it != directory_iterator(); ++it ){
-        if (is_regular_file(it->status())){
-            auto path = it->path();
-            string ext = path.extension().string();
-            to_lower(ext);
-            if(fileExtension == ext)
-                files.push_back(make_pair(path.string(),
-                                          out_directory + path.filename().string())); // CHECK
-        }
-    }
-
-    size_t numErrors = 0;
+    size_t num_errors = 0;
     float progressStep = 1.0 / (files.size()+1);
     unsigned i = 0;
 
     for(auto&& file : files){
-        if(verbose) cout << "\nConverting file:\n" << file.first << " to\n" << file.second << endl;
+        string path_input = directory + file;
+        string path_output = out_directory + getBasename(file) + ".exr";
+        if(verbose) cout << "\nConverting file:\n" << path_input << " to\n" << path_output << endl;
         else showProgress(progressStep*i++);
-        Mat image = imread(file.first, cv::IMREAD_UNCHANGED);
+        Mat image = imread(path_input, cv::IMREAD_UNCHANGED);
+        Mat image_out = image;
 
-        Mat imageOut = doConversion ? convertDepth(image, intrinsics) : image;
-        if(doNoise) imageOut = addNoise(imageOut, intrinsics, doNormalShift, 1.0, discrVal);
+        // apply conversions
+        if(do_distConversion) image_out = convertDistanceToZ(image, intrinsics);
+        else if(do_dispConversion) image_out = convertDisparityToZ(image);
+        if(doNoise) image_out = addNoise(image_out, intrinsics, do_normalShift, 1.0, discr_val);
 
-        if(imageOut.total() == 0) {
-            numErrors++;
+        if(image_out.total() == 0) {
+            num_errors++;
             cerr << "Conversion returned empty file." << endl;
-        } else if(exists(file.second)) {
-            numErrors++;
+        } else if(exists(path_output)) {
+            num_errors++;
             cerr << "File exists already." << endl;
         } else {
-            imwrite(file.second, imageOut);
+            imwrite(path_output, image_out);
         }
     }
 
-    cout << "\nDone. Errors: " << numErrors << endl;
+    cout << "\nDone. Errors: " << num_errors << endl;
 
     return 0;
 }

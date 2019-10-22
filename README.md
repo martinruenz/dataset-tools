@@ -1,8 +1,16 @@
-# Installation
+Various dataset tools
+=====================
+
+  # Installation
+  --------------
 
    ## Requirements
 
    * opencv
+   * pcl and flann for `evaluate_reconstruction`
+
+    `sudo apt-get install libpcl-dev libflann-dev`
+
    * glm for trajectory_tool
 
     `sudo apt-get install libglm-dev`
@@ -21,7 +29,8 @@
     #   Log out and in again afterwards!
     echo "PATH=\$PATH:`pwd`" >> ~/.profile
 
-# HowTos
+  # HowTos
+  --------
 
   * **How to evaluate your object-aware SLAM-method completely automatically?** (Analyse segmentation and trajectory quality)
 
@@ -35,7 +44,7 @@
 
     <br />
     Example using Co-Fusion:
-
+    
         CoFusion \
           -basedir /path/to/CarScene4/ \
           -dir colour \
@@ -112,12 +121,12 @@
           # and different IDs (-r, where the parameter is id,id,id)
 
 
-# Tools
+  # Tools
+  ------
 
+  ### Scripts
 
-  ## Scripts
-
-  ### Blender
+  #### Blender
 
   └── **io_export_pose.py**  
 
@@ -142,7 +151,7 @@
       t x y z qx qy qz qw  
   ![screenrecording](images/trajectoryViewer.gif)
 
-  ## C++ Tools
+  ### C++ Tools
 
   **convert_depth** *[Blender]*
 
@@ -186,7 +195,3 @@
   **label_merger**
 
   Merge labels with certain amount of neighbours.
-
-# License
-
-  More information regarding licensing can be found in LICENCES.txt

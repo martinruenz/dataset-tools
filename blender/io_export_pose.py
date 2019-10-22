@@ -1,30 +1,28 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
+# ==================================================================
+# This file is part of https://github.com/martinruenz/dataset-tools
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>
+# ==================================================================
 
 bl_info = {
-    "name": "Export Camera Poses",
+    "name": "Export Poses",
     "author": "Martin Rünz", # inspired by 'export cameras & markers' (Campbell Barton) and 'export Clarises' (Ruchir Shah)
     # see: https://wiki.blender.org/index.php/Extensions:2.6/Py/Scripts/Import-Export/ClarisseCameraExport
-    "version": (0, 2),
-    "blender": (2, 6, 9),
-    "api": 60995,
-    "location": "File > Export > Export Camera Poses",
-    "description": "Export Blender Cameras Poses",
+    "version": (0, 4),
+    "blender": (2, 80, 0),
+    "location": "File > Export > Export Poses",
+    "description": "Export poses of selected object / camera",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:",
     "tracker_url": "http://projects.blender.org/tracker/index.php?func=detail&aid=",
@@ -35,67 +33,49 @@ import bpy
 import bpy_extras
 import mathutils
 import math
-from mathutils import *
-from math import *
+# from mathutils import *
+# from math import *
 from bpy.props import *
 from bpy_extras.io_utils import ExportHelper
 
-def transformationToString(T, scaling_factor, useQuaternions, positiveZ=False):
-    t = T.to_translation() * scaling_factor
-    r = T.to_3x3()
-    if positiveZ:
-        r = r * mathutils.Euler((math.radians(180.0), 0.0, 0.0), 'XYZ').to_matrix()
-    result = '%f %f %f' %(t[0], t[1], t[2])
-    if useQuaternions:
-        q = r.to_quaternion()
-        result = result + ' %f %f %f %f\n' %(q.x, q.y, q.z, q.w)
-    else:
-        r = r.to_euler()
-        result = result + ' %f %f %f\n' %(r[0], r[1], r[2])
-    return result
+import sys
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).parent.absolute()))
+from pose_helpers import *
 
-def exportPoses(context, filepath, frame_start, frame_end, scaling_factor, useQuaternions, appendFrameNumber, cam_positive_z):
+def export_poses(context, filepath, frame_start, frame_end, scaling_factor, useQuaternions, appendFrameNumber, cam_positive_z, header_row):
 
-    obj=[]
     scene = bpy.context.scene
-    obj = scene.objects.active
-    cam = scene.camera
+    obj = bpy.context.active_object
 
     if obj == None:
         print("No active object.")
         return
 
-    print("Exporting: ", obj)
-    #print("Selected object name: ", obj.name)
+    print("Exporting: '{}', scaling factor: {}".format(obj.name, scaling_factor))
 
+    # Export world coordinates of currently selected object / camera
     frame_range = range(frame_start, frame_end + 1)
-
-    print("scaling factor %s" % scaling_factor)
-
-    # EXPORT CAMERA COORDINATES
     myFile=open(filepath,'w')
+
+    if header_row:
+        header = "translation_x translation_y translation_z quaternion_x quaternion_y quaternion_z quaternion_w\n"
+        if appendFrameNumber:
+            header = "frame " + header
+        header = "# " + header
+        myFile.write(header)
+
     for f in frame_range:
         scene.frame_set(f)
-        line = transformationToString(obj.matrix_world, scaling_factor, useQuaternions, obj.type == 'CAMERA' and cam_positive_z)
+        line = transformation_to_string(obj.matrix_world, scaling_factor, useQuaternions, obj.type == 'CAMERA' and cam_positive_z)
         if appendFrameNumber:
             line = ('%i ' % f) + line
         myFile.write(line)
     myFile.close()
 
-    # EXPORT object-poses relative to CAMERA FRAME
-    #if obj.type != 'CAMERA' and cam != None:
-    #    myFile=open(filepath + "-in-cam.txt",'w')
-    #    for f in frame_range:
-    #        scene.frame_set(f)
-    #        line = transformationToString(cam.matrix_world.inverted() * obj.matrix_world, scaling_factor, useQuaternions)
-    #        if appendFrameNumber:
-    #            line = ('%i ' % f) + line
-    #        myFile.write(line)
-    #    myFile.close()
-
     return
 
-class CameraExporter(bpy.types.Operator, ExportHelper):
+class PoseExporter(bpy.types.Operator, ExportHelper):
 
     bl_idname = "export_animation.cameras"
     bl_label = "Export Settings"
@@ -104,7 +84,7 @@ class CameraExporter(bpy.types.Operator, ExportHelper):
     filter_glob = StringProperty(default="*.txt", options={'HIDDEN'})
 
     scaling_factor = FloatProperty(name="Scaling factor",
-            description="Multiply camera position by this factor",
+            description="Multiply position vector by this factor",
             default=1, min=0.0001, max=100000)
 
 
@@ -118,17 +98,18 @@ class CameraExporter(bpy.types.Operator, ExportHelper):
     quaternion_representation = BoolProperty(name="Use quaternions", default=True)
     append_frame_number = BoolProperty(name="Append frame", default=True)
     cam_positive_z = BoolProperty(name="Positive Z (cam)", default=True)
-    #alsoRelativeToCamera = BoolProperty(name="+ Relative to camera", default=False)
+    header_row = BoolProperty(name="Add column titles / header", default=True)
 
     def execute(self, context):
-        exportPoses(context,
+        export_poses(context,
                     self.filepath,
                     self.frame_start,
                     self.frame_end,
                     self.scaling_factor,
                     self.quaternion_representation,
                     self.append_frame_number,
-                    self.cam_positive_z)
+                    self.cam_positive_z,
+                    self.header_row)
                     #, self.alsoRelativeToCamera
         return {'FINISHED'}
 
@@ -144,16 +125,16 @@ class CameraExporter(bpy.types.Operator, ExportHelper):
 def menu_export(self, context):
     import os
     default_path = os.path.splitext(bpy.data.filepath)[0] + ".txt"
-    self.layout.operator(CameraExporter.bl_idname, text="Camera Poses Export (.txt)").filepath = default_path
+    self.layout.operator(PoseExporter.bl_idname, text="Poses Export (.txt)").filepath = default_path
 
 
 def register():
-    bpy.types.INFO_MT_file_export.append(menu_export)
-    bpy.utils.register_class(CameraExporter)
+    bpy.types.TOPBAR_MT_file_export.append(menu_export)
+    bpy.utils.register_class(PoseExporter)
 
 def unregister():
-    bpy.types.INFO_MT_file_export.remove(menu_export)
-    bpy.utils.unregister_class(CameraExporter)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_export)
+    bpy.utils.unregister_class(PoseExporter)
 
 if __name__ == "__main__":
     register()

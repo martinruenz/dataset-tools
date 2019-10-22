@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>
 #include "../common/common.h"
 #include <opencv2/calib3d/calib3d.hpp>
 #include <fstream>
-#include <Eigen/Geometry>
 #include <opencv2/core/eigen.hpp>
 
 using namespace std;
@@ -34,9 +33,9 @@ vector<Point3f> getObjectPattern(Size pattern_size, float square_size){
 
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv);
+    Parser parser(argc, argv);
 
-    if(!Parser::hasOption("-i") || !Parser::hasOption("-w") || !Parser::hasOption("-h")){
+    if(!parser.hasOption("-i") || !parser.hasOption("-w") || !parser.hasOption("-h")){
         cout << "Error, invalid arguments.\n"
                 "Mandatory -i: Path to directory containing containing rgb images with patterns (and depth images, if -d is not used).\n"
                 "Mandatory -w: Number of inner corners, axis 1.\n"
@@ -56,18 +55,18 @@ int main(int argc, char * argv[])
     }
 
     const size_t num_images_calibration = 50;
-    string in_rgb_path = Parser::getPathOption("-i");
-    string in_depth_path = Parser::hasOption("-d") ? Parser::getPathOption("-d") : in_rgb_path;
-    string out_path = Parser::getPathOption("-o");
-    string prefix_rgb = Parser::getStringOption("--prefix_rgb", "Color");
-    string prefix_d = Parser::getStringOption("--prefix_d", "Depth");
-    Size pattern_size(Parser::getIntOption("-h"), Parser::getIntOption("-w"));
+    string in_rgb_path = parser.getDirOption("-i");
+    string in_depth_path = parser.hasOption("-d") ? parser.getDirOption("-d") : in_rgb_path;
+    string out_path = parser.getDirOption("-o");
+    string prefix_rgb = parser.getStringOption("--prefix_rgb", "Color");
+    string prefix_d = parser.getStringOption("--prefix_d", "Depth");
+    Size pattern_size(parser.getIntOption("-h"), parser.getIntOption("-w"));
     Size image_size(0,0);
-    float square_size = Parser::getFloatOption("-s");
-    float depth_scale = Parser::getFloatOption("depth_scale", 0.2);
-    bool verbose = Parser::hasOption("-v");
-    bool do_export = Parser::hasOption("-o");
-    bool has_calibration = Parser::hasOption("-cx") && Parser::hasOption("-cy") && Parser::hasOption("-fx") && Parser::hasOption("-fy");
+    float square_size = parser.getFloatOption("-s");
+    float depth_scale = parser.getFloatOption("depth_scale", 0.2);
+    bool verbose = parser.hasOption("-v");
+    bool do_export = parser.hasOption("-o");
+    bool has_calibration = parser.hasOption("-cx") && parser.hasOption("-cy") && parser.hasOption("-fx") && parser.hasOption("-fy");
 
     if(!exists(in_rgb_path) || !exists(in_depth_path) || (do_export && !exists(out_path))) {
         cerr << "Directory does not exist." << endl;
@@ -83,7 +82,7 @@ int main(int argc, char * argv[])
 
     Mat calibration;
     if(has_calibration){
-        double data[9] = { Parser::getDoubleOption("-fx"), 0, Parser::getDoubleOption("-cx"), 0, Parser::getDoubleOption("-fy"), Parser::getDoubleOption("-cy"), 0, 0, 1 };
+        double data[9] = { parser.getDoubleOption("-fx"), 0, parser.getDoubleOption("-cx"), 0, parser.getDoubleOption("-fy"), parser.getDoubleOption("-cy"), 0, 0, 1 };
         Mat(3, 3, CV_64F, data).copyTo(calibration);
     } else {
         calibration = Mat::eye(3, 3, CV_64F);

@@ -16,33 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>
 *****************************************************************/
 
 #include "../common/common.h"
+#include "../common/common_labels.h"
 
 using namespace std;
 using namespace cv;
-
-int getColorIndex(const vector<Vec3b>& colors, const Vec3b& color){
-    for(size_t i = 0; i < colors.size(); i++)
-        if(color==colors[i])
-            return i;
-    return -1;
-}
-
-void findColors(Mat input, vector<Vec3b>& colors){
-
-    if(input.type() != CV_8UC3) {
-        throw std::invalid_argument("Error, invalid image format.");
-        return;
-    }
-
-    for (int i = 0; i < input.rows; ++i){
-        for (int j = 0; j < input.cols; ++j){
-            Vec3b pixel = input.at<Vec3b>(i, j);
-            int colorIndex = getColorIndex(colors, pixel);
-            if(colorIndex < 0 && pixel != Vec3b(0,0,0)) colors.push_back(pixel);
-        }
-    }
-}
-
 
 Mat countColorNeighbors(Mat input, const vector<Vec3b>& colors){
     Mat neighborCounts = Mat::zeros(colors.size(),colors.size(),CV_32SC1);
@@ -76,9 +53,9 @@ Mat countColorNeighbors(Mat input, const vector<Vec3b>& colors){
 
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv);
+    Parser parser(argc, argv);
 
-    if(!Parser::hasOption("--dir") || !Parser::hasOption("--outdir")){
+    if(!parser.hasOption("--dir") || !parser.hasOption("--outdir")){
         cout << "Error, invalid arguments.\n"
                 "Mandatory --dir: Path to directory containing label images.\n"
                 "Mandatory --outdir: Output path.\n"
@@ -89,10 +66,10 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    string directory = Parser::getOption("--dir");
-    string out_directory = Parser::getOption("--outdir");
+    string directory = parser.getOption("--dir");
+    string out_directory = parser.getOption("--outdir");
     int neighborCnt = 10;
-    if(Parser::hasOption("-c")) neighborCnt = Parser::getIntOption("-c");
+    if(parser.hasOption("-c")) neighborCnt = parser.getIntOption("-c");
 
     for(int currentFrame=0; ; currentFrame++){
 

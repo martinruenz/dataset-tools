@@ -23,20 +23,20 @@ using namespace cv;
 
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv);
+    Parser parser(argc, argv);
 
-    if(!Parser::hasOption("-d")){
+    if(!parser.hasOption("--dir") || !parser.hasOption("--outdir")){
         cout << "This tool converts RGB-images to ID-images, or vice-versa.\n\n";
         cout << "Error, invalid arguments.\n"
-                "Mandatory -d: Path to directory containing Mask####.png images.\n"
-                "Optional -p: Store *-converted.png instead of *.pgm files. (Implicit if --toRGB)\n"
+                "Mandatory --dir: Path to directory containing mask images.\n"
+                "Mandatory --outdir: Path to output directory.\n"
+                "Optional -p: Store .png instead of .pgm files. (Implicit if --toRGB)\n"
                 "Optional -s: Skip existing files.\n"
-                "Optional -a: Treat all png files (not just the ones starting with 'Mask..') as input.\n"
                 "Optional -n: Just simulate and don't write anything to disc.\n"
                 "Optional -v: Verbose.\n"
                 "Optional --toRGB: Convert to ID to RGB.\n"
                 "\n"
-                "Example: ./convert_masks -d /path/to/image_folder/\n"
+                "Example: ./convert_masks --dir /path/to/input_folder --outdir /path/to/out_folder/\n"
                 "\n\n"
                 "Useful commands: 'See source-code of this line (comments)'" << endl;
                 // Backup: rename 's/Mask(\d{4})\.png/MB_$1/' *.png
@@ -45,48 +45,35 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    string directory = Parser::getOption("-d");
-    bool skipExisting = Parser::hasOption("-s");
-    bool allPNGs = Parser::hasOption("-a");
-    bool doWrite = !Parser::hasOption("-n");
-    bool verbose = Parser::hasOption("-v");
-    bool toRGB = Parser::hasOption("--toRGB");
-    bool storePNG = Parser::hasOption("-p") || toRGB;
+    string directory = parser.getDirOption("--dir");
+    string out_directory = parser.getDirOption("--outdir");
+    bool skipExisting = parser.hasOption("-s");
+    bool doWrite = !parser.hasOption("-n");
+    bool verbose = parser.hasOption("-v");
+    bool toRGB = parser.hasOption("--toRGB");
+    bool storePNG = parser.hasOption("-p") || toRGB;
 
-    vector<pair<string,string> > files; // path in / path out
-
-    using namespace boost::filesystem;
-    using namespace boost::algorithm;
-    for(auto it = directory_iterator(directory); it != directory_iterator(); ++it ){
-        if (is_regular_file(it->status())){
-            auto path = it->path();
-            string name = path.stem().string();
-            string ext = path.extension().string();
-            to_lower(ext);
-            if((name.substr(0,4) == "Mask" || allPNGs) && ext == ".png" && name.find("converted") == std::string::npos) {
-                if(storePNG) files.push_back(make_pair(path.string(), path.parent_path().string() + "/" + name + "-converted.png"));
-                else files.push_back(make_pair(path.string(), path.parent_path().string() + "/" + name + ".pgm"));
-            }
-        }
-    }
+    vector<string> files = getFilenames(directory, {".png", ".ppm"});
 
     std::vector<cv::Vec3b> colors;
     size_t numErrors = 0;
 
     for(auto&& file : files){
-        if(skipExisting && exists(file.second)){
-            cout << "Skipping file: " << file.second << " (already exists). Warning: Completely ignored!" << endl;
+        string path_input = directory + file;
+        string path_output = out_directory + getBasename(file) + (storePNG ? ".png" : ".pgm");
+        if(skipExisting && exists(path_output)){
+            cout << "Skipping file: " << path_output << " (already exists). Warning: Completely ignored!" << endl;
             continue;
         }
-        if(verbose) cout << "\nConverting file:\n" << file.first << " to\n" << file.second << endl;
-        Mat image = imread(file.first);
-        Mat imageOut;
-        if(toRGB) imageOut = labelToColourImage(image);
-        else imageOut = colourToLabelImage(image, colors);
-        if(imageOut.total() == 0) numErrors++;
+        if(verbose) cout << "\nConverting file:\n" << path_input << " to\n" << path_output << endl;
+        Mat image = imread(path_input);
+        Mat image_out;
+        if(toRGB) image_out = labelToColourImage(image);
+        else image_out = colourToLabelImage(image, colors);
+        if(image_out.total() == 0) numErrors++;
         else if(doWrite) {
-            if(storePNG) imwrite(file.second, imageOut);
-            else imwrite(file.second, imageOut, { CV_IMWRITE_PXM_BINARY });
+            if(storePNG) imwrite(path_output, image_out);
+            else imwrite(path_output, image_out, { cv::IMWRITE_PXM_BINARY });
         }
     }
 

@@ -47,9 +47,9 @@ bool convertFile(const std::string& input, const std::string& output, float min,
 
 int main(int argc, char * argv[])
 {
-  Parser::init(argc, argv);
+  Parser parser(argc, argv);
 
-  if(!Parser::hasOption("-i") || !Parser::hasOption("-o")) {
+  if(!parser.hasOption("-i") || !parser.hasOption("-o")) {
     cout << "Error, invalid arguments.\n"
             "Mandatory -i: Input image or directory.\n"
             "Mandatory -o: Output image or directory.\n"
@@ -61,10 +61,10 @@ int main(int argc, char * argv[])
     return 1;
   }
 
-  string input = Parser::getOption("-i");
-  string output = Parser::getOption("-o");
-  float min = Parser::hasOption("-min") ? Parser::getFloatOption("-min") : 0;
-  float max = Parser::hasOption("-max") ? Parser::getFloatOption("-max") : 1;
+  string input = parser.getOption("-i");
+  string output = parser.getOption("-o");
+  float min = parser.hasOption("-min") ? parser.getFloatOption("-min") : 0;
+  float max = parser.hasOption("-max") ? parser.getFloatOption("-max") : 1;
 
   if(exists(input) && is_directory(input) ) {
     if(!exists(output) || !is_directory(output))

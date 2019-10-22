@@ -32,7 +32,7 @@ ax[:set_ylabel]("Y axis")
 ax[:set_zlabel]("Z axis")
 
 function draw_axis(c,v,color)
-  p = c+v
+  p = vec(c)+vec(v)
   ax[:plot]([c[1], p[1]], [c[2], p[2]], [c[3], p[3]], color=color, lw=3)
 end
 
@@ -42,9 +42,9 @@ for file in ARGS
   for i = 1:size(Q)[1]
     R = rotationmatrix(Q[i])
     s = 0.01
-    draw_axis(data[i,2:4]', R * [s;0.0;0.0], "red")
-    draw_axis(data[i,2:4]', R * [0.0;s;0.0], "green")
-    draw_axis(data[i,2:4]', R * [0.0;0.0;s], "blue")
+    draw_axis(data[i,2:4], R * [s;0.0;0.0], "red")
+    draw_axis(data[i,2:4], R * [0.0;s;0.0], "green")
+    draw_axis(data[i,2:4], R * [0.0;0.0;s], "blue")
   end
 end
 plt[:axis]("equal")

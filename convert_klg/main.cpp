@@ -40,15 +40,18 @@ using namespace cv;
 int main(int argc, char * argv[])
 {
     //return 0; // outsourced computations, test if it is still working.
-    Parser::init(argc, argv);
+    Parser parser(argc, argv);
     //printf("Running with OpenCV: %s", cv::getBuildInformation().c_str());
 
-    if(!Parser::hasOption("-i") || !Parser::hasOption("-o")){
+    if(!parser.hasOption("-i")
+            || !parser.hasOption("-o")
+            || (!parser.hasOption("-plys") && !parser.hasOption("-frames"))
+            || (parser.hasOption("-tum") && parser.hasOption("-sub"))){
         cout << "Error, invalid arguments.\n"
                 "Mandatory -i: Input klg file.\n"
                 "Mandatory -o: Output directory.\n"
-                "Optional -a: Extract image files (jpg/png+exr).\n"
-                "Optional -n: Only extract image files (jpg/png+exr).\n"
+                "Optional -frames: Extract image files (jpg/png+exr/png), this or -clouds is required.\n"
+                "Optional -clouds: Extract a ply pointcloud per frame, this or -frames is required.\n"
                 "Optional -m: Min depth in mm (default value: 2).\n"
                 "Optional -s: Silent. Don't show frames during export.\n"
                 "Optional -w: Image width (default value: 640).\n"
@@ -59,22 +62,34 @@ int main(int argc, char * argv[])
                 "Optional -fy: Focal length y (default value: 528).\n"
                 "Optional -f: Numer of frame (only this frame is processed).\n"
                 "Optional -png: Export PNG instead of JPG.\n"
-                "Optional -tum: Export in TUM format, when exporting frames.\n"
+                "Optional -tum: Export in TUM format, when exporting frames ('-frames'). Incompatible to '-sub'.\n"
+                "Optional -sub: Export depth and rgb frames to different folders ('depth', 'color'), when exporting frames ('-frames'). Incompatible to '-tum'.\n"
                 "Optional -depthpng: Export depth images as 16-bit greyscale PNG instead of float exr.\n"
                 "Optional -depthmin: Min depth value for export.\n"
                 "Optional -depthscale: Multiply depth values with this factor, before writing PNGs. [1=mm,0.1=m...] (Default: 5, as in TUM).\n"
-                "5000"
                 "\n"
                 "Example: ./convert_klgToPly -i test.klg -o /path/to/output_folder/" << endl;
         return 1;
     }
 
-    string outputDir = Parser::getOption("-o");
-    string inputFile = Parser::getOption("-i");
+    string outputDir = parser.getOption("-o");
+    string inputFile = parser.getOption("-i");
+    string outputDirCloud = outputDir;
+    string outputDirRGB = outputDir;
+    string outputDirDepth = outputDir;
 
-    if(!exists(inputFile) || !exists(outputDir)) {
-        cout << "Invalid parameters." << endl;
+    if(!exists(inputFile)) {
+        cout << "Input file does not exist." << endl;
         return 1;
+    }
+
+    if(!exists(outputDir)){
+        if(parser.askYesNo("Output directory does not exist. Create?")){
+            createDirectory(outputDir);
+        } else {
+            cout << "Cancelling." <<endl;
+            return 1;
+        }
     }
 
     PinholeParameters intrinsics;
@@ -82,30 +97,28 @@ int main(int argc, char * argv[])
     intrinsics.cy = 240;
     intrinsics.fx = 528;
     intrinsics.fy = 528;
-    float depthmin = Parser::getFloatOption("-depthmin",  2.0 / 1000);
-    float depthscale = Parser::getFloatOption("-depthscale", 5);
+    float depthmin = parser.getFloatOption("-depthmin",  2.0 / 1000);
+    float depthscale = parser.getFloatOption("-depthscale", 5);
     unsigned width = 640;
     unsigned height = 480;
     const int numPixel = width*height;
-    bool alsoImages = Parser::hasOption("-a");
-    bool noPointCloud = Parser::hasOption("-n");
-    bool silent = Parser::hasOption("-s");
-    bool depthPNG = Parser::hasOption("-depthpng");
-    bool tumFormat = Parser::hasOption("-tum");
+    //bool alsoImages = parser.hasOption("-a");
+    //bool noPointCloud = parser.hasOption("-n");
+    bool extract_images = parser.hasOption("-frames");
+    bool extract_clouds = parser.hasOption("-clouds");
+    bool silent = parser.hasOption("-s");
+    bool depthPNG = parser.hasOption("-depthpng");
+    bool tumFormat = parser.hasOption("-tum");
+    bool subdirs = parser.hasOption("-sub");
     const string depthFileExt = depthPNG ? ".png" : ".exr";
-    const string colorFileExt = Parser::hasOption("-png") ? ".png" : ".jpg";
-    if(Parser::hasOption("-m")) depthmin = 0.001 * Parser::getFloatOption("-m");
-    if(Parser::hasOption("-w")) width = Parser::getIntOption("-w");
-    if(Parser::hasOption("-h")) height = Parser::getIntOption("-h");
-    if(Parser::hasOption("-cx")) intrinsics.cx = Parser::getFloatOption("-cx");
-    if(Parser::hasOption("-cy")) intrinsics.cy = Parser::getFloatOption("-cy");
-    if(Parser::hasOption("-fy")) intrinsics.fy = Parser::getFloatOption("-fy");
-    if(Parser::hasOption("-fx")) intrinsics.fx = Parser::getFloatOption("-fx");
-
-    if(noPointCloud && !alsoImages) {
-        cout << "Invalid parameters: -n requires -a" << endl;
-        return 0;
-    }
+    const string colorFileExt = parser.hasOption("-png") ? ".png" : ".jpg";
+    if(parser.hasOption("-m")) depthmin = 0.001 * parser.getFloatOption("-m");
+    if(parser.hasOption("-w")) width = parser.getIntOption("-w");
+    if(parser.hasOption("-h")) height = parser.getIntOption("-h");
+    if(parser.hasOption("-cx")) intrinsics.cx = parser.getFloatOption("-cx");
+    if(parser.hasOption("-cy")) intrinsics.cy = parser.getFloatOption("-cy");
+    if(parser.hasOption("-fy")) intrinsics.fy = parser.getFloatOption("-fy");
+    if(parser.hasOption("-fx")) intrinsics.fx = parser.getFloatOption("-fx");
 
     int numFrames = 0;
     unsigned char* depthReadBuffer;
@@ -122,8 +135,15 @@ int main(int argc, char * argv[])
         fDList.open(outputDir+"/depth.txt");
         fRGBList.open(outputDir+"/rgb.txt");
         fAssociations.open(outputDir+"/associations.txt");
-        boost::filesystem::create_directories(outputDir+"/rgb");
-        boost::filesystem::create_directories(outputDir+"/depth");
+        outputDirRGB += "/rgb";
+        outputDirDepth += "/depth";
+        boost::filesystem::create_directories(outputDirRGB);
+        boost::filesystem::create_directories(outputDirDepth);
+    } else if(subdirs){
+        outputDirRGB += "/color";
+        outputDirDepth += "/depth";
+        boost::filesystem::create_directories(outputDirRGB);
+        boost::filesystem::create_directories(outputDirDepth);
     }
     FILE* fp = fopen(inputFile.c_str(), "rb");
     CHECK_THROW(fread(&numFrames, sizeof(int32_t), 1, fp));
@@ -135,11 +155,13 @@ int main(int argc, char * argv[])
 
     cout << "Start working on KLG file with " << numFrames << " frames..." << endl;
 
-    float progressStep = 1.0 / (numFrames+1);
+    Progress progress(numFrames);
     size_t numErrors = 0;
     int currentFrame=0;
-    if(Parser::hasOption("-f")){
-        int frame = Parser::getIntOption("-f");
+
+    // Skip beginning of sequence
+    if(parser.hasOption("-f")){
+        int frame = parser.getIntOption("-f");
         while(currentFrame < frame && currentFrame < numFrames) {
             CHECK_THROW(fread(&timestamp, sizeof(int64_t), 1, fp));
             CHECK_THROW(fread(&depthSize, sizeof(int32_t), 1, fp));
@@ -148,7 +170,7 @@ int main(int argc, char * argv[])
             if(imageSize > 0) CHECK_THROW(fread(imageReadBuffer, imageSize, 1, fp));
 
             currentFrame++;
-            showProgress(currentFrame*progressStep);
+            progress.show();
         }
         numFrames = currentFrame+1;
     }
@@ -180,7 +202,7 @@ int main(int argc, char * argv[])
 
         Mat depth(height, width, CV_16UC1, (unsigned short*)&decompressionBufferDepth[0]);
         Mat rgb(height, width, CV_8UC3, (unsigned char*)&decompressionBufferImage[0]);
-        cvtColor(rgb, rgb, CV_BGR2RGB);
+        cvtColor(rgb, rgb, cv::COLOR_BGR2RGB);
 
         if(!silent){
             cv::imshow("Depth", depth);
@@ -193,33 +215,35 @@ int main(int argc, char * argv[])
         depth.convertTo(depthMetric, CV_32FC1, 0.001);
 
         // Optional image export
-        if(alsoImages){
-            std::string depthPath, rgbPath, ts;
+        if(extract_images){
+            std::string depthName, rgbName, ts;
             if(tumFormat){
                 ts = to_string(timestamp);//timestamp / double(1e6);
                 ts.insert(ts.end()-6,'.');
-                depthPath = "depth/"+ts+depthFileExt;
-                rgbPath = "rgb/"+ts+colorFileExt;
-                fDList << ts << " " << depthPath << endl;
-                fRGBList << ts << " " << rgbPath << endl;
-                fAssociations << ts << " " << rgbPath << " " << ts << " " << depthPath << endl;
-                depthPath = outputDir+"/"+depthPath;
-                rgbPath = outputDir+"/"+rgbPath;
+                depthName = ts+depthFileExt;
+                rgbName = ts+colorFileExt;
+                fDList << ts << " depth/" << depthName << endl;
+                fRGBList << ts << " rgb/" << rgbName << endl;
+                fAssociations << ts << " rgb/" << rgbName << " " << ts << " depth/" << depthName << endl;
             } else {
-                depthPath = outputDir+"/Depth"+indexStr+depthFileExt;
-                rgbPath = outputDir+"/Color"+indexStr+colorFileExt;
+                depthName = "Depth"+indexStr+depthFileExt;
+                rgbName = "Color"+indexStr+colorFileExt;
             }
-            cv::imwrite(rgbPath, rgb);
-            if(depthPNG) imwrite(depthPath, depthscale * depth);
-            else imwrite(depthPath, depthMetric); //storeFloatImage(depthMetric, depthPath, 0, 50);
+            cv::imwrite(outputDirRGB + "/" + rgbName, rgb);
+            if(depthPNG) {
+                depth *= depthscale; // weirdly, putting this in the function call leads to a segmentation fault. (seems to be an opencv bug)
+                imwrite(outputDirDepth + "/" + depthName, depth);
+            } else {
+                imwrite(outputDirDepth + "/" + depthName, depthMetric); //storeFloatImage(depthMetric, depthPath, 0, 50);
+            }
         }
 
         // 3D generation
-        if(!noPointCloud){
+        if(extract_clouds){
             Projected3DCloud points(depthMetric, rgb, intrinsics, depthmin);
-            points.toPly(outputDir+"/Points"+indexStr+".ply");
+            points.toPly(outputDirCloud+"/Points"+indexStr+".ply");
         }
-        showProgress(currentFrame*progressStep);
+        progress.show();
     }
 
     cout << "\nDone. Errors: " << numErrors << endl;

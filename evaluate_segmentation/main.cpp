@@ -82,8 +82,8 @@ void intersectionOverUnion(Mat labels1,
 
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv);
-    if(!Parser::hasOption("--dir") || !Parser::hasOption("--dirgt")){
+    Parser parser(argc, argv);
+    if(!parser.hasOption("--dir") || !parser.hasOption("--dirgt")){
         cout << "Error, invalid arguments.\n"
                 "Mandatory --dir: Your segmentation results.\n"
                 "Mandatory --dirgt: Ground-truth segmentation.\n"
@@ -93,6 +93,8 @@ int main(int argc, char * argv[])
                 "Optional --width: your index-width\n"
                 "Optional --widthgt: ground-truth index-width\n"
                 "Optional --outtxt: create a text-file with per image data.\n"
+                "Optional --label: this label will be treated as foreground (=1), everything else is background. \n"
+                "Optional --labelgt: this ground-truth label will be treated as foreground (=1), everything else is background.\n"
                 "Optional -v: Be verbose.\n"
                 "\n"
                 "This tool tries to match all labels in both images, except if you provide --labelgt and --label."
@@ -100,29 +102,29 @@ int main(int argc, char * argv[])
         return 0;
     }
 
-    bool verbose = Parser::hasOption("-v");
+    bool verbose = parser.hasOption("-v");
 
-    string directory = Parser::getPathOption("--dir");
-    string gt_directory = Parser::getPathOption("--dirgt");
+    string directory = parser.getDirOption("--dir");
+    string gt_directory = parser.getDirOption("--dirgt");
 
-    string prefix = Parser::getOption("--prefix");
-    string gt_prefix = Parser::getOption("--prefixgt");
+    string prefix = parser.getOption("--prefix");
+    string gt_prefix = parser.getOption("--prefixgt");
 
-    int index_width = Parser::getIntOption("--width");
-    int gt_index_width = Parser::getIntOption("--widthgt");
-    int start_index = Parser::getIntOption("--starti");
+    int index_width = parser.getIntOption("--width");
+    int gt_index_width = parser.getIntOption("--widthgt");
+    int start_index = parser.getIntOption("--starti");
 
-    uchar gt_label = Parser::getUCharOption("--labelgt");
-    uchar label = Parser::getUCharOption("--label");
-    uchar* pgt_label = Parser::hasOption("--labelgt") ? &gt_label : nullptr;
-    uchar* plabel = Parser::hasOption("--label") ? &label : nullptr;
+    uchar gt_label = parser.getUCharOption("--labelgt");
+    uchar label = parser.getUCharOption("--label");
+    uchar* pgt_label = parser.hasOption("--labelgt") ? &gt_label : nullptr;
+    uchar* plabel = parser.hasOption("--label") ? &label : nullptr;
 
     vector<pair<unsigned,unsigned>> totals(256,{0,0});
     vector<float> avg(256,0);
     vector<unsigned> seenCnt(256,0);
 
     ofstream file;
-    if(Parser::hasOption("--outtxt")) file.open(Parser::getOption("--outtxt"), ofstream::out | ofstream::app);
+    if(parser.hasOption("--outtxt")) file.open(parser.getOption("--outtxt"), ofstream::out | ofstream::app);
 
     for(int i = start_index; ; i++){
         stringstream ss_gtbase, ss_base;

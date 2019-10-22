@@ -37,28 +37,32 @@ using namespace cv;
 
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv);
+    Parser parser(argc, argv);
 
-    if(!Parser::hasOption("--out") ||
-       !Parser::hasOption("--depthdir") ||
-       !Parser::hasOption("--rgbdir")){
+    if(!parser.hasOption("--out") ||
+       !parser.hasOption("--depthdir") ||
+       !parser.hasOption("--rgbdir")){
       cout << "Error, invalid arguments.\n"
               "Mandatory --depthdir: Path to directory containing containing depth images.\n"
               "Mandatory --rgbdir: Path to directory containing rgb images.\n"
               "Mandatory --out: Output klg path.\n"
               "Optional --fps: Frames per second (default: 24.00).\n"
+              "Optional --timestamps: File that provides a timestamp for each frame (one per line).\n"
+              "Optional --tss: Timestamp scaling factor.\n"
               "Optional -s: Factor, which scales depth values to [m] (default: 1.00).\n";
       return 1;
     }
 
-    string dirRGB = Parser::getPathOption("--rgbdir");
-    string dirDepth = Parser::getPathOption("--depthdir");
+    string dirRGB = parser.getDirOption("--rgbdir");
+    string dirDepth = parser.getDirOption("--depthdir");
 
+    string inputTimestamps = parser.getOption("--timestamps");
+    double tss = parser.getDoubleOption("--tss", 1);
     vector<string> inputRGBs = getFilenames(dirRGB, { ".jpg", ".png"});
     vector<string> inputDepths = getFilenames(dirDepth, { ".exr", ".png"});
-    string outfile = Parser::getOption("--out");
-    float depthScale = Parser::getFloatOption("-s", 1.0);
-    float fps = Parser::getFloatOption("-fps", 24.0);
+    string outfile = parser.getOption("--out");
+    float depthScale = 1000 * parser.getFloatOption("-s", 1.0);
+    float fps = parser.getFloatOption("-fps", 24.0);
 
     if(inputRGBs.size() == 0 || inputRGBs.size() != inputDepths.size()) {
       cerr << "Input empt or not matching." << endl;
@@ -68,6 +72,12 @@ int main(int argc, char * argv[])
     if(exists(outfile)){
       cerr << "Out file already exists.\n" << endl;
       return 2;
+    }
+
+    vector<string> timestamps;
+    if(inputTimestamps != ""){
+        timestamps = readFileLines(inputTimestamps, true);
+        if(timestamps.size() != inputRGBs.size()) throw invalid_argument("Number of input timestamps != number of images");
     }
 
     float progressStep = 1.0 / (inputRGBs.size()+1);
@@ -90,7 +100,7 @@ int main(int argc, char * argv[])
 
         // Load input
         cv::Mat rgb = imread(pathRGB);
-        cv::cvtColor(rgb, rgb, CV_RGB2BGR);
+        cv::cvtColor(rgb, rgb, cv::COLOR_RGB2BGR);
         cv::Mat depth = imread(pathDepth, cv::IMREAD_UNCHANGED);
 
         if(rgb.total() == 0) throw std::invalid_argument("Could not read rgb-image file: " + pathRGB);
@@ -98,7 +108,13 @@ int main(int argc, char * argv[])
         if(rgb.total() != depth.total()) throw std::invalid_argument("Image sizes are not matching.");
         if(!rgb.isContinuous() || !depth.isContinuous()) throw std::invalid_argument("Data has to be continuous.");
 
-        if(!(depthScale == 0.001 && depth.type() == CV_16UC1)) depth.convertTo(depth, CV_16UC1, 1000 * depthScale);
+        if(depthScale != 1 || depth.type() != CV_16UC1) depth.convertTo(depth, CV_16UC1, depthScale);
+
+        if(timestamps.size()){
+            timestamp = std::stod(timestamps[i]) * tss;
+        } else {
+            timestamp += timeStep;
+        }
 
         // Write frame header
         int32_t depthSize = depth.total() * depth.elemSize();
@@ -110,8 +126,6 @@ int main(int argc, char * argv[])
         // Write frame data
         outStream.write((char*)depth.data, depthSize);
         outStream.write((char*)rgb.data, rgbSize);
-
-        timestamp += timeStep;
     }
 
     outStream.close();

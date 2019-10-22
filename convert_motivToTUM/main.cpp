@@ -40,18 +40,18 @@ struct RigidObject {
 
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv);
+    Parser parser(argc, argv);
 
-    if(!Parser::hasOption("--in") ||
-            !Parser::hasOption("--outdir")){
+    if(!parser.hasOption("--in") ||
+            !parser.hasOption("--outdir")){
         cout << "Error, invalid arguments.\n"
                 "Mandatory --in: Path to directory containing containing depth images.\n"
                 "Mandatory --outdir: Output directory (has to exist).\n";
         return 1;
     }
 
-    string in_path = Parser::getOption("--in");
-    string out_path = Parser::getPathOption("--outdir");
+    string in_path = parser.getOption("--in");
+    string out_path = parser.getDirOption("--outdir");
 
     if(!exists(in_path)){
         cerr << "Input file not found." << endl;

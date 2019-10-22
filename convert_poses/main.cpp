@@ -24,15 +24,15 @@ using namespace cv;
 #if 0 // Convert a coordinate to each coordinate frame:
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv, true);
+    parser.init(argc, argv, true);
 
-    if(!Parser::hasOption("--file") || !Parser::hasOption("--out") || !Parser::hasOption("--center")){
+    if(!parser.hasOption("--file") || !parser.hasOption("--out") || !parser.hasOption("--center")){
         cerr << "Error, invalid arguments.\n";
         return 0;
     }
 
-    string infile = Parser::getOption("--file");
-    string outfile = Parser::getOption("--out");
+    string infile = parser.getOption("--file");
+    string outfile = parser.getOption("--out");
 
     if(exists(outfile)){
         cerr << "Out file already exists.\n";
@@ -44,7 +44,7 @@ int main(int argc, char * argv[])
         return 0;
     }
 
-    Eigen::Vector3f center = stringToEigenVec(Parser::getOption("--center"));
+    Eigen::Vector3f center = stringToEigenVec(parser.getOption("--center"));
     ofstream out_stream(outfile);
 
     string line;
@@ -91,25 +91,25 @@ Pose extractPoseFromFile(const std::string& file, int timestamp){
 
 int main(int argc, char * argv[])
 {
-    Parser::init(argc, argv, true);
+    Parser parser(argc, argv, true);
 
 
-    if(!Parser::hasOption("--frame")  || // frame number
-       !Parser::hasOption("--object") || // object poses (file with ts, tx, ty, tz, qx, qy, qz, qw)
-       !Parser::hasOption("--camera") || // camera / global poses
-       !Parser::hasOption("--gtobject") || // ground-truth object poses
-       !Parser::hasOption("--gtcamera") || // ground-truth camera poses
-       !Parser::hasOption("--out")){ // output file
+    if(!parser.hasOption("--frame")  || // frame number
+       !parser.hasOption("--object") || // object poses (file with ts, tx, ty, tz, qx, qy, qz, qw)
+       !parser.hasOption("--camera") || // camera / global poses
+       !parser.hasOption("--gtobject") || // ground-truth object poses
+       !parser.hasOption("--gtcamera") || // ground-truth camera poses
+       !parser.hasOption("--out")){ // output file
         cerr << "Error, invalid arguments.\n";
         return 1;
     }
 
-    string objectfile = Parser::getOption("--object");
-    string camerafile = Parser::getOption("--camera");
-    string gtobjectfile = Parser::getOption("--gtobject");
-    string gtcamerafile = Parser::getOption("--gtcamera");
-    string outfile = Parser::getOption("--out");
-    int frame = Parser::getIntOption("--frame");
+    string objectfile = parser.getOption("--object");
+    string camerafile = parser.getOption("--camera");
+    string gtobjectfile = parser.getOption("--gtobject");
+    string gtcamerafile = parser.getOption("--gtcamera");
+    string outfile = parser.getOption("--out");
+    int frame = parser.getIntOption("--frame");
 
     if(exists(outfile)){
         cerr << "Out file already exists.\n";
