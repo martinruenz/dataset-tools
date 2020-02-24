@@ -6,6 +6,7 @@ sys.path.insert(0,str(Path(__file__).parent.absolute()))
 import utils_calib
 import utils_pose
 import utils_mesh
+import utils_scene
 import bpy
 import mathutils
 import math
@@ -45,7 +46,13 @@ parser.add_argument('--elevation_angle', type=str, default='random',
 parser.add_argument('--render_checkerboard', action='store_true',
                     help='Also render the object with checkerboard pattern')
 
+parser.add_argument('--render_texture',
+                    help='Provide a texture which is also rendered')
 
+parser.add_argument('--environment',
+                    help='Provide a background environment map')
+
+parser.add_argument('--save_blend', action='store_true')
 """
 Example calib file:
 640 480 500 500 250 250\n
@@ -58,6 +65,7 @@ argv = sys.argv[sys.argv.index("--") + 1:]
 args = parser.parse_args(argv)
 path_poses_file = str(Path(args.output) / "poses.txt")
 path_output = Path(args.output)
+path_output.mkdir(parents=True, exist_ok=True)
 random_elevation = False
 if args.elevation_angle == "random":
     elevation = random.uniform(-85, 85)
@@ -84,6 +92,9 @@ for o in bpy.data.objects:
     o.select_set(True)
 bpy.ops.object.delete(use_global=True)
 nodes.clear()
+
+if args.environment is not None:
+    utils_scene.set_environment_map(args.environment)
 
 # Load mesh
 utils_mesh.import_mesh(args.input)
@@ -210,6 +221,36 @@ if args.render_checkerboard:
     mat_checker_output.base_path = ""
     links.new(node_rl_checker.outputs['Image'], mat_checker_output.inputs[0])
 
+# Setup rendering of texture
+if args.render_texture:
+    mat_texture = bpy.data.materials.new('textureboard_mat')
+    mat_texture.use_nodes = True
+    mat_texture_nodes = mat_texture.node_tree.nodes
+    mat_texture_links = mat_texture.node_tree.links
+    mat_texture_nodes.clear()
+
+    node_uv_texture = mat_texture_nodes.new(type="ShaderNodeTexCoord")
+    node_tex_texture = mat_texture_nodes.new(type="ShaderNodeTexImage")
+    node_tex_texture.image = load_image(args.render_texture, None, recursive=False)
+    node_diffuse_texture = mat_texture_nodes.new(type="ShaderNodeBsdfDiffuse")
+    node_output_texture = mat_texture_nodes.new(type="ShaderNodeOutputMaterial")
+
+    # mat_texture_links.new(node_uv_texture.outputs['UV'], node_tex_texture.inputs[0])
+    mat_texture_links.new(node_tex_texture.outputs['Color'], node_diffuse_texture.inputs[0])
+    mat_texture_links.new(node_diffuse_texture.outputs['BSDF'], node_output_texture.inputs[0])
+
+    object.data.materials.append(mat_texture)
+
+    view_layer_texture = scene.view_layers.new("texture layer")
+    view_layer_texture.material_override = mat_texture
+    node_rl_texture = nodes.new(type='CompositorNodeRLayers')
+    node_rl_texture.layer = "texture layer"
+
+    mat_texture_output = nodes.new(type="CompositorNodeOutputFile")
+    mat_texture_output.label = 'texture Output'
+    mat_texture_output.base_path = ""
+    links.new(node_rl_texture.outputs['Image'], mat_texture_output.inputs[0])
+
 # node_normal_output = nodes.new(type="CompositorNodeOutputFile")
 # node_normal_output.label = 'Normal Output'
 # node_normal_output.base_path = ""
@@ -244,6 +285,9 @@ path_depth = str(path_output / 'depth_{0:03d}.png')
 path_normal = str(path_output / 'normal_{0:03d}.png')
 path_nocs = str(path_output / 'nocs_{0:03d}.png')
 path_checker = str(path_output / 'checker_{0:03d}.png')
+
+if args.save_blend:
+    bpy.ops.wm.save_as_mainfile(filepath=str(path_output / 'scene.blend'))
 
 for i in range(0, args.num_views):
     print("Rotation {}, {}".format((azimuth_step * i), math.radians(azimuth_step * i)))
