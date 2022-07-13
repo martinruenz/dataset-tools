@@ -37,10 +37,6 @@ import math
 # from math import *
 from bpy.props import *
 from bpy_extras.io_utils import ExportHelper
-
-import sys
-from pathlib import Path
-sys.path.insert(0,str(Path(__file__).parent.absolute()))
 from pose_helpers import *
 
 def export_poses(context, filepath, frame_start, frame_end, scaling_factor, useQuaternions, appendFrameNumber, cam_positive_z, header_row):

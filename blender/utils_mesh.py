@@ -17,13 +17,45 @@
 
 import bpy
 import pathlib
+import numpy as np
 
-def import_mesh(path):
-    ext = pathlib.Path(path).suffix.lower()
+
+def import_mesh(path, name=None, collection=None):
+    """
+    Imports obj / ply files, and returns object. If an object with the same name
+    already exists, the existing object is returned and nothing is imported.
+    """
+    from utils_scene import get_collection
+    p = pathlib.Path(path)
+    ext = p.suffix.lower()
     path = str(path)
-    if ext == ".obj":
+    if name is None:
+        name = p.stem
+    if name in bpy.data.objects:
+        o = bpy.data.objects[name]
+    elif ext == ".obj":
         bpy.ops.import_scene.obj(filepath=path)
+        o = bpy.context.view_layer.objects.active
     elif ext == ".ply":
         bpy.ops.import_mesh.ply(filepath=path)
+        o = bpy.context.view_layer.objects.active
     else:
         raise RuntimeError("Unknown mesh format: ", path)
+    o.name = name
+    c = get_collection(collection)
+    if name not in c.objects:
+        c.objects.link(o)
+    return o
+
+
+def import_points(path):
+    ext = pathlib.Path(path).suffix.lower()
+    path = str(path)
+    if ext == ".xyz":
+        return np.loadtxt(path)
+    elif ext == ".npy":
+        return np.load(path)
+    else:
+        raise RuntimeError("Unknown cloud format: ", path)
+
+# def import_auto(path, collection=None):

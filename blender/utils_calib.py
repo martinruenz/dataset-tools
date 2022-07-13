@@ -78,7 +78,7 @@ def set_calibration(w, h, fx, fy, cx, cy, scene, camera_data):
         scene.render.pixel_aspect_x = aspect
     else:
         scene.render.pixel_aspect_y = aspect
-    if w/2 != cx or h/2 != cy:
+    if (w-1)/2 != cx or (h-1)/2 != cy:
         raise NotImplementedError("...")
 
     camera_data.type = 'PERSP'

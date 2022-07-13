@@ -107,7 +107,7 @@ void RawLogReader::getNext()
     if(flipColors)
     {
         cv::Mat3b rgb(Resolution::getInstance().rows(), Resolution::getInstance().cols(), (cv::Vec<unsigned char, 3> *)deCompImage->imageData, Resolution::getInstance().width() * 3);
-        cv::cvtColor(rgb, rgb, CV_RGB2BGR);
+        cv::cvtColor(rgb, rgb, cv::COLOR_RGB2BGR);
     }
 
     currentFrame++;

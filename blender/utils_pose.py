@@ -18,16 +18,16 @@
 import mathutils
 import math
 
-def transformation_to_string(T, scaling_factor, useQuaternions, positiveZ=False):
-    t = T.to_translation() * scaling_factor
-    r = T.to_3x3()
+def transformation_to_string(transform, scaling_factor, useQuaternions, positiveZ=False):
+    t = transform.to_translation() * scaling_factor
+    r = transform.to_3x3()
     if positiveZ:
         r = r @ mathutils.Euler((math.radians(180.0), 0.0, 0.0), 'XYZ').to_matrix()
-    result = '%f %f %f' %(t[0], t[1], t[2])
+    result = '%f %f %f'.format(t[0], t[1], t[2])
     if useQuaternions:
         q = r.to_quaternion()
-        result = result + ' %f %f %f %f\n' %(q.x, q.y, q.z, q.w)
+        result = result + ' %f %f %f %f\n'.format(q.x, q.y, q.z, q.w)
     else:
         r = r.to_euler()
-        result = result + ' %f %f %f\n' %(r[0], r[1], r[2])
+        result = result + ' %f %f %f\n'.format(r[0], r[1], r[2])
     return result
